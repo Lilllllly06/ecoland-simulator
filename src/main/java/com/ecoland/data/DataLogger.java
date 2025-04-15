@@ -1,1 +1,190 @@
-package com.ecoland.data;\n\nimport com.ecoland.entity.SpeciesType;\nimport com.ecoland.simulation.EntityManager;\n\nimport java.io.FileWriter;\nimport java.io.IOException;\nimport java.io.PrintWriter;\nimport java.util.ArrayList;\nimport java.util.List;\n\n/**\n * Logs simulation statistics over time and provides functionality to save the log.\n */\npublic class DataLogger {\n\n    private static class LogEntry {\n        long tick;\n        int herbivoreCount;\n        int carnivoreCount;\n        int plantCount; // Assuming we might track explicit Plant entities later\n        int totalPopulation;\n\n        LogEntry(long tick, int herbivoreCount, int carnivoreCount, int plantCount, int totalPopulation) {\n            this.tick = tick;\n            this.herbivoreCount = herbivoreCount;\n            this.carnivoreCount = carnivoreCount;\n            this.plantCount = plantCount;\n            this.totalPopulation = totalPopulation;\n        }\n\n        String toCsvRow() {\n            return String.format(\"%d,%d,%d,%d,%d\",\n                                 tick, totalPopulation, herbivoreCount, carnivoreCount, plantCount);\n        }\n\n        static String getCsvHeader() {\n            return \"Tick,TotalPopulation,Herbivores,Carnivores,Plants\";\n        }\n    }\n\n    private final List<LogEntry> logHistory = new ArrayList<>();\n    private final int logFrequency; // Log every N ticks\n\n    public DataLogger(int logFrequency) {\n        this.logFrequency = Math.max(1, logFrequency); // Ensure frequency is at least 1\n    }\n\n    public DataLogger() {\n        this(10); // Default: log every 10 ticks\n    }\n\n    /**\n     * Records the current simulation state if the current tick is a multiple of the log frequency.\n     *\n     * @param currentTick The current simulation tick number.\n     * @param entityManager The entity manager to get population counts from.\n     */\n    public void recordTick(long currentTick, EntityManager entityManager) {\n        if (currentTick % logFrequency == 0) {\n            int herbivoreCount = entityManager.getPopulationCount(SpeciesType.HERBIVORE);\n            int carnivoreCount = entityManager.getPopulationCount(SpeciesType.CARNIVORE);\n            int plantCount = entityManager.getPopulationCount(SpeciesType.PLANT); // Track plants if they are entities\n            int totalPopulation = entityManager.getTotalPopulation();\n\n            LogEntry entry = new LogEntry(currentTick, herbivoreCount, carnivoreCount, plantCount, totalPopulation);\n            logHistory.add(entry);\n            // System.out.println(\"DataLogger: Recorded tick \" + currentTick); // Debug logging\n        }\n    }\n\n    /**\n     * Saves the recorded simulation data to a CSV file.\n     *\n     * @param filename The full path to the file where the data should be saved.\n     * @return true if saving was successful, false otherwise.\n     */\n    public boolean saveData(String filename) {\n        if (logHistory.isEmpty()) {\n            System.out.println(\"DataLogger: No data to save.\");\n            return false;\n        }\n\n        try (PrintWriter writer = new PrintWriter(new FileWriter(filename))) {\n            // Write header\n            writer.println(LogEntry.getCsvHeader());\n\n            // Write data rows\n            for (LogEntry entry : logHistory) {\n                writer.println(entry.toCsvRow());\n            }\n\n            System.out.println(\"DataLogger: Successfully saved data to \" + filename);\n            return true;\n        } catch (IOException e) {\n            System.err.println(\"DataLogger: Error saving data to \" + filename + \" - \" + e.getMessage());\n            e.printStackTrace();\n            return false;\n        }\n    }\n\n    public void clearLog() {\n        logHistory.clear();\n        System.out.println(\"DataLogger: Log cleared.\");\n    }\n} 
+package com.ecoland.data;
+
+import com.ecoland.simulation.EntityManager;
+import com.ecoland.entity.SpeciesType;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Logs simulation data over time
+ */
+public class DataLogger {
+    
+    private final List<DataPoint> dataPoints = new ArrayList<>();
+    private final int logInterval;
+    private long lastLoggedTick = -1;
+    
+    /**
+     * Creates a new DataLogger that logs every N ticks
+     * @param logInterval Number of ticks between logging points
+     */
+    public DataLogger(int logInterval) {
+        this.logInterval = logInterval;
+    }
+    
+    /**
+     * Records simulation data for the current tick
+     * @param tick Current simulation tick
+     * @param entityManager Entity manager containing population data
+     */
+    public void recordTick(long tick, EntityManager entityManager) {
+        // Only log at the specified interval
+        if (tick % logInterval != 0 && tick != 0) {
+            return;
+        }
+        
+        // Skip if we've already logged this tick (prevent duplicate logging)
+        if (tick == lastLoggedTick) {
+            return;
+        }
+        
+        int herbivoreCount = entityManager.getPopulationCount(SpeciesType.HERBIVORE);
+        int carnivoreCount = entityManager.getPopulationCount(SpeciesType.CARNIVORE);
+        int plantCount = entityManager.getPopulationCount(SpeciesType.PLANT);
+        
+        DataPoint dataPoint = new DataPoint(
+            tick,
+            herbivoreCount,
+            carnivoreCount,
+            plantCount
+        );
+        
+        dataPoints.add(dataPoint);
+        lastLoggedTick = tick;
+    }
+    
+    /**
+     * Gets all recorded data points
+     * @return List of data points
+     */
+    public List<DataPoint> getDataPoints() {
+        return dataPoints;
+    }
+    
+    /**
+     * Gets the most recent data point
+     * @return The most recent data point, or null if none exist
+     */
+    public DataPoint getLatestDataPoint() {
+        if (dataPoints.isEmpty()) {
+            return null;
+        }
+        return dataPoints.get(dataPoints.size() - 1);
+    }
+    
+    /**
+     * Gets data for the specified number of most recent ticks
+     * @param count Number of data points to return
+     * @return List of recent data points
+     */
+    public List<DataPoint> getRecentDataPoints(int count) {
+        if (dataPoints.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        int startIndex = Math.max(0, dataPoints.size() - count);
+        return dataPoints.subList(startIndex, dataPoints.size());
+    }
+    
+    /**
+     * Saves logged data to a CSV file
+     * @param filePath Path to save the data
+     * @return true if save was successful, false otherwise
+     */
+    public boolean saveData(String filePath) {
+        if (dataPoints.isEmpty()) {
+            System.out.println("No data to save");
+            return false;
+        }
+        
+        try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
+            // Write header
+            writer.println("Tick,Herbivores,Carnivores,Plants");
+            
+            // Write data
+            for (DataPoint point : dataPoints) {
+                writer.println(
+                    point.tick + "," +
+                    point.herbivoreCount + "," + 
+                    point.carnivoreCount + "," +
+                    point.plantCount
+                );
+            }
+            
+            System.out.println("Data saved to: " + filePath);
+            return true;
+        } catch (IOException e) {
+            System.err.println("Error saving data: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Represents a single data point in time
+     */
+    public static class DataPoint {
+        public final long tick;
+        public final int herbivoreCount;
+        public final int carnivoreCount;  
+        public final int plantCount;
+        public final long timestamp;
+        
+        public DataPoint(long tick, int herbivoreCount, int carnivoreCount, int plantCount) {
+            this.tick = tick;
+            this.herbivoreCount = herbivoreCount;
+            this.carnivoreCount = carnivoreCount;
+            this.plantCount = plantCount;
+            this.timestamp = System.currentTimeMillis();
+        }
+    }
+    
+    /**
+     * Gets population data history for charting
+     * @param count Maximum number of data points to return
+     * @return List of arrays containing [tick, herbivores, carnivores, plants, total]
+     */
+    public List<long[]> getPopulationData(int count) {
+        List<long[]> result = new ArrayList<>();
+        
+        // Get recent data points, limited by count
+        List<DataPoint> points = getRecentDataPoints(count);
+        
+        // Convert to arrays for easier processing in charts
+        for (DataPoint point : points) {
+            long total = point.herbivoreCount + point.carnivoreCount + point.plantCount;
+            result.add(new long[]{
+                point.tick,
+                point.herbivoreCount,
+                point.carnivoreCount,
+                point.plantCount,
+                total
+            });
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Calculates statistics for genes of a particular species
+     * @param entityManager Entity manager containing the entities
+     * @param speciesType Species type to analyze
+     * @return Map of gene name to statistics array [min, max, avg, stdDev]
+     */
+    public Map<String, double[]> getGeneStats(EntityManager entityManager, SpeciesType speciesType) {
+        Map<String, double[]> result = new HashMap<>();
+        
+        // This is a placeholder implementation that returns empty stats
+        // In a real implementation, you would:
+        // 1. Get all entities of the specified species
+        // 2. For each gene, calculate min, max, avg, stdDev
+        // 3. Return the statistics
+        
+        return result;
+    }
+} 

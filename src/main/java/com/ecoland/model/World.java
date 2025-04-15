@@ -8,6 +8,10 @@ public class World {
     private final int height;
     private final Tile[][] grid;
 
+    /**
+     * Creates a new world with the specified dimensions.
+     * The world is automatically initialized with terrain using the default generator.
+     */
     public World(int width, int height) {
         if (width <= 0 || height <= 0) {
             throw new IllegalArgumentException("World dimensions must be positive.");
@@ -16,6 +20,25 @@ public class World {
         this.height = height;
         this.grid = new Tile[width][height];
         initializeWorld();
+    }
+    
+    /**
+     * Creates a new world with the specified dimensions.
+     * @param width Width of the world in tiles
+     * @param height Height of the world in tiles
+     * @param initialize Whether to automatically initialize the world with terrain
+     */
+    public World(int width, int height, boolean initialize) {
+        if (width <= 0 || height <= 0) {
+            throw new IllegalArgumentException("World dimensions must be positive.");
+        }
+        this.width = width;
+        this.height = height;
+        this.grid = new Tile[width][height];
+        
+        if (initialize) {
+            initializeWorld();
+        }
     }
 
     private void initializeWorld() {

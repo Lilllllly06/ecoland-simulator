@@ -9,6 +9,7 @@ import java.util.Random;
 
 public class Plant extends Entity {
 
+    // Constants related to plant growth and decay
     private static final double BASE_GROWTH_RATE = 0.05; // Base growth per tick
     private static final double FERTILITY_SCALING = 0.1; // How much fertility affects growth
     private static final double MAX_GROWTH_PER_TICK = 0.1;
@@ -18,14 +19,13 @@ public class Plant extends Entity {
 
     private static final Random random = new Random();
 
-    // Plant-specific attributes
-    private double spreadChance = 0.01; // Chance per tick to try spreading seeds
-
-    /** Constructor for initial placement with default genes */
+    /** Constructor for initial placement (uses default genes) */
     public Plant(int x, int y) {
-        // Plants don't move, so speed/vision are irrelevant (use 0 or default)
-        // Reproduction cost/threshold could represent seeding cost/maturity
-        super(x, y, INITIAL_PLANT_ENERGY, 1.0, SpeciesType.PLANT, 0, 0, 1.5, 0.5);
+        // Plants don't move, so use the constructor that creates default genes
+        super(x, y, SpeciesType.PLANT);
+        
+        // Initialize specific plant values if needed
+        this.energy = INITIAL_PLANT_ENERGY;
     }
 
     /** Constructor for offspring with inherited genes */
@@ -47,8 +47,8 @@ public class Plant extends Entity {
         // 1. Grow based on tile fertility
         grow(currentTile);
 
-        // 2. Attempt to spread seeds (reproduce)
-        if (random.nextDouble() < spreadChance) {
+        // 2. Attempt to spread seeds using genetic spreadChance
+        if (random.nextDouble() < getSpreadChance()) { // Use getter for genetic trait
             spreadSeeds(simulation);
         }
 
@@ -71,7 +71,8 @@ public class Plant extends Entity {
     private void spreadSeeds(Simulation simulation) {
         // Use reproductionThreshold and reproductionCost from genes
         if (this.energy >= getReproductionThreshold()) {
-             Entity offspring = simulation.spawnOffspring(this, SpeciesType.PLANT);
+             // Pass parent's genes for mutation and inheritance
+             Entity offspring = simulation.spawnOffspring(this, SpeciesType.PLANT, this.genes);
              if (offspring != null) {
                  depleteEnergy(getReproductionCost()); // Use cost from genes
              }

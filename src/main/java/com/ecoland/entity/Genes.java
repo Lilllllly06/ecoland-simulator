@@ -22,9 +22,9 @@ public class Genes {
     public final double reproductionCost;      // Energy cost to reproduce
     public final double maxHealth;          // Max health (optional, could be fixed)
 
-    // Species-specific traits (optional examples)
-    // public final double herbivoreEatRate;
-    // public final double carnivoreAttackDamage;
+    // Species-specific traits
+    public final double spreadChance;       // Plant-specific: chance per tick to attempt spreading
+    // public final double carnivoreAttackDamage; // Example for future
 
     /**
      * Constructor for creating default genes for a species.
@@ -41,6 +41,7 @@ public class Genes {
                 this.reproductionThreshold = 80.0;
                 this.reproductionCost = 40.0;
                 this.maxHealth = 100.0;
+                this.spreadChance = 0.0; // Not applicable
                 break;
             case CARNIVORE:
                 this.speed = 1.2;
@@ -50,11 +51,11 @@ public class Genes {
                 this.reproductionThreshold = 100.0;
                 this.reproductionCost = 50.0;
                 this.maxHealth = 100.0;
+                this.spreadChance = 0.0; // Not applicable
                 break;
             case PLANT:
             default:
                 // Plants might have different relevant genes (e.g., growth rate, spread chance)
-                // Using some defaults for now, although they might not be directly used by Plant logic yet
                 this.speed = 0.0;
                 this.visionRange = 0.0;
                 this.maxEnergy = 10.0; // Represents max size/maturity?
@@ -62,6 +63,7 @@ public class Genes {
                 this.reproductionThreshold = 8.0; // Maturity threshold for seeding
                 this.reproductionCost = 2.0;  // Cost for seeding
                 this.maxHealth = 1.0;
+                this.spreadChance = 0.01; // Default spread chance gene
                 break;
         }
     }
@@ -79,6 +81,7 @@ public class Genes {
         this.reproductionThreshold = mutate(parentGenes.reproductionThreshold);
         this.reproductionCost = mutate(parentGenes.reproductionCost);
         this.maxHealth = mutate(parentGenes.maxHealth);
+        this.spreadChance = mutate(parentGenes.spreadChance); // Mutate spread chance
     }
 
     /**
@@ -91,16 +94,23 @@ public class Genes {
             double change = value * MUTATION_MAGNITUDE * (random.nextDouble() * 2 - 1); // +/- change
             double mutatedValue = value + change;
             // Ensure values don't go below a reasonable minimum (e.g., 0 or small epsilon)
-            return Math.max(0.01, mutatedValue);
+            // For probabilities like spreadChance, also cap at 1.0
+            if (value <= 1.0 && value >= 0.0) { // Crude check if it's likely a probability
+                 mutatedValue = Math.max(0.0, Math.min(1.0, mutatedValue));
+            } else {
+                 mutatedValue = Math.max(0.01, mutatedValue); // General minimum for other stats
+            }
+            return mutatedValue;
         }
         return value;
     }
 
     @Override
     public String toString() {
+        // Add spreadChance to the output string
         return String.format(
-            "Genes[Spd:%.2f, Vis:%.2f, MaxE:%.1f, Eff:%.2f, RepT:%.1f, RepC:%.1f, MaxH:%.1f]",
-            speed, visionRange, maxEnergy, energyEfficiency, reproductionThreshold, reproductionCost, maxHealth
+            "Genes[Spd:%.2f, Vis:%.2f, MaxE:%.1f, Eff:%.2f, RepT:%.1f, RepC:%.1f, MaxH:%.1f, Sprd:%.3f]",
+            speed, visionRange, maxEnergy, energyEfficiency, reproductionThreshold, reproductionCost, maxHealth, spreadChance
         );
     }
 } 

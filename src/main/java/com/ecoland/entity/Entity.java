@@ -1,5 +1,6 @@
 package com.ecoland.entity;
 
+import com.ecoland.ai.nn.AnimalBrain;
 import com.ecoland.model.World;
 import com.ecoland.simulation.Simulation;
 
@@ -11,6 +12,7 @@ public abstract class Entity {
     protected final SpeciesType speciesType;
     protected boolean isAlive = true;
     protected final Genes genes;
+    protected AnimalBrain brain; // Neural network brain for advanced decision-making
 
     public Entity(int x, int y, SpeciesType speciesType, Genes genes) {
         this.x = x;
@@ -19,10 +21,27 @@ public abstract class Entity {
         this.genes = genes;
         this.health = genes.maxHealth;
         this.energy = genes.maxEnergy * 0.7;
+        
+        // Initialize brain for animals (not plants)
+        if (speciesType != SpeciesType.PLANT) {
+            this.brain = new AnimalBrain((int)genes.visionRange);
+        }
     }
 
     public Entity(int x, int y, SpeciesType speciesType) {
         this(x, y, speciesType, new Genes(speciesType));
+    }
+    
+    /**
+     * Create an entity with a specific brain (for offspring with inherited brains).
+     */
+    protected Entity(int x, int y, SpeciesType speciesType, Genes genes, AnimalBrain parentBrain) {
+        this(x, y, speciesType, genes);
+        
+        // Override with parent's brain (with mutations)
+        if (parentBrain != null && speciesType != SpeciesType.PLANT) {
+            this.brain = new AnimalBrain(parentBrain); // Copy parent's brain
+        }
     }
 
     /**
@@ -95,6 +114,10 @@ public abstract class Entity {
     public Genes getGenes() {
         return genes;
     }
+    
+    public AnimalBrain getBrain() {
+        return brain;
+    }
 
     public double getSpeed() {
         return genes.speed;
@@ -118,6 +141,10 @@ public abstract class Entity {
 
     public double getMaxHealth() {
         return genes.maxHealth;
+    }
+
+    public double getSpreadChance() {
+        return genes.spreadChance;
     }
 
     public void setPosition(int x, int y) {

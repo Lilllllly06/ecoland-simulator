@@ -147,4 +147,55 @@ public class EntityManager {
     public int getTotalPopulation() {
          return (int) entities.stream().filter(Entity::isAlive).count();
     }
+
+    /**
+     * Gets a list of all entities of a specific species type.
+     * @param speciesType The species type to filter by
+     * @return List of entities of the specified type
+     */
+    public List<Entity> getEntitiesByType(SpeciesType speciesType) {
+        return entities.stream()
+                .filter(Entity::isAlive)
+                .filter(e -> e.getSpeciesType() == speciesType)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Checks if a specific tile is occupied by any entity other than the specified entity.
+     * @param x X coordinate.
+     * @param y Y coordinate.
+     * @param excludeEntity The entity to exclude from the check.
+     * @return true if the tile is occupied by another entity, false otherwise.
+     */
+    public boolean isTileOccupiedByOther(int x, int y, Entity excludeEntity) {
+        // Check if any entity (excluding the specified one) occupies the tile
+        for (Entity entity : entities) {
+            if (entity.isAlive() && entity.getX() == x && entity.getY() == y && entity != excludeEntity) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get all entities within a specific range of a point.
+     * 
+     * @param x Center x coordinate
+     * @param y Center y coordinate
+     * @param range Range to search (Manhattan distance)
+     * @return List of entities within the range
+     */
+    public List<Entity> getEntitiesInRange(int x, int y, int range) {
+        List<Entity> result = new ArrayList<>();
+        for (Entity entity : entities) {
+            if (entity.isAlive()) {
+                int dx = Math.abs(entity.getX() - x);
+                int dy = Math.abs(entity.getY() - y);
+                if (dx <= range && dy <= range) {
+                    result.add(entity);
+                }
+            }
+        }
+        return result;
+    }
 } 
