@@ -223,4 +223,3 @@ public class NeuralNetwork implements Serializable {
         return child;
     }
 } 
-} 

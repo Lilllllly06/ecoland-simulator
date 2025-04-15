@@ -276,9 +276,144 @@ public class Carnivore extends Entity {
      * Flee from a threat
      */
     private void flee(Simulation simulation, World world) {
-        // Implementation of fleeing behavior
-        // ...
+        // Simple implementation of fleeing behavior
+        EntityManager entityManager = simulation.getEntityManager();
+        List<Entity> threats = entityManager.findEntitiesInRange(x, y, getVisionRange(), SpeciesType.CARNIVORE, world);
+        
+        // Remove self from threats
+        threats.removeIf(e -> e == this);
+        
+        if (threats.isEmpty()) {
+            return;
+        }
+        
+        // Move in random direction for now
+        int dx = random.nextInt(3) - 1;
+        int dy = random.nextInt(3) - 1;
+        
+        moveBy(simulation, dx, dy, world);
     }
-
-    // ... rest of the methods ...
+    
+    /**
+     * Basic wander implementation
+     */
+    private void wander(Simulation simulation, World world) {
+        moveAccumulator += getSpeed();
+        
+        while (moveAccumulator >= 1.0) {
+            int dx = random.nextInt(3) - 1;
+            int dy = random.nextInt(3) - 1;
+            
+            moveBy(simulation, dx, dy, world);
+            
+            moveAccumulator -= 1.0;
+        }
+    }
+    
+    /**
+     * Simple find and set target implementation
+     */
+    private void findAndSetTarget(Simulation simulation, World world) {
+        // Simplified implementation
+        EntityManager entityManager = simulation.getEntityManager();
+        List<Entity> prey = entityManager.findEntitiesInRange(x, y, getVisionRange(), SpeciesType.HERBIVORE, world);
+        
+        if (!prey.isEmpty()) {
+            targetPrey = prey.get(0);
+            if (isInAttackRange(targetPrey)) {
+                currentState = State.ATTACKING;
+            } else {
+                targetCoords = new int[]{targetPrey.getX(), targetPrey.getY()};
+                currentState = State.FOLLOWING_PATH;
+            }
+        } else {
+            currentState = State.WANDERING;
+        }
+    }
+    
+    /**
+     * Simple follow path implementation
+     */
+    private void followPath(Simulation simulation, World world) {
+        if (targetCoords == null) return;
+        
+        int dx = Integer.compare(targetCoords[0], x);
+        int dy = Integer.compare(targetCoords[1], y);
+        
+        moveBy(simulation, dx, dy, world);
+        
+        // Check if reached target
+        if (x == targetCoords[0] && y == targetCoords[1]) {
+            targetCoords = null;
+            currentState = State.IDLE;
+        }
+    }
+    
+    /**
+     * Simple validate target path implementation
+     */
+    private void validateTargetPath(World world) {
+        // Simplified implementation
+        if (targetPrey != null && !targetPrey.isAlive()) {
+            targetPrey = null;
+            targetCoords = null;
+            currentState = State.IDLE;
+        }
+    }
+    
+    /**
+     * Simple decide state implementation
+     */
+    private void decideState(Simulation simulation, World world) {
+        // Simplified implementation
+        if (energy >= getReproductionThreshold()) {
+            currentState = State.REPRODUCING;
+        } else if (energy < getMaxEnergy() * HUNGER_THRESHOLD_FACTOR) {
+            currentState = State.HUNTING;
+        } else {
+            currentState = State.WANDERING;
+        }
+    }
+    
+    /**
+     * Simple reproduce implementation
+     */
+    private void reproduce(Simulation simulation) {
+        if (energy >= getReproductionThreshold()) {
+            Entity offspring = simulation.spawnOffspring(this, SpeciesType.CARNIVORE, this.genes);
+            if (offspring != null) {
+                depleteEnergy(getReproductionCost());
+            }
+        }
+    }
+    
+    /**
+     * Move with speed multiplier
+     */
+    private boolean moveBy(Simulation simulation, int dx, int dy, World world, double speedMultiplier) {
+        int nextX = x + dx;
+        int nextY = y + dy;
+        
+        if (world.isValidCoordinate(nextX, nextY)) {
+            Tile targetTile = world.getTile(nextX, nextY);
+            if (targetTile != null && targetTile.isPassable(this) &&
+                !simulation.getEntityManager().isTileOccupiedByOther(nextX, nextY, this)) {
+                
+                double energyCost = MOVE_ENERGY_COST_FACTOR * getSpeed() * speedMultiplier;
+                if (energy >= energyCost) {
+                    depleteEnergy(energyCost);
+                    setPosition(nextX, nextY);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Move with default speed
+     */
+    private boolean moveBy(Simulation simulation, int dx, int dy, World world) {
+        return moveBy(simulation, dx, dy, world, 1.0);
+    }
 } 
