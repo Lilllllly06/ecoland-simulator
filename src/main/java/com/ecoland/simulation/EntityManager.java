@@ -41,10 +41,12 @@ public class EntityManager {
 
     /**
      * Updates the main entity list by adding pending entities and removing marked entities.
+     * Only entities that are dead and not needed anymore are actually removed.
      * Should be called once per simulation tick, after all entity updates are done.
      */
     public void updateEntityList() {
-        entities.removeAll(entitiesToRemove);
+        // Remove entities that are marked for removal
+        entities.removeIf(entity -> entitiesToRemove.contains(entity) && !entity.isAlive());
         entities.addAll(entitiesToAdd);
         entitiesToRemove.clear();
         entitiesToAdd.clear();
@@ -197,5 +199,71 @@ public class EntityManager {
             }
         }
         return result;
+    }
+
+    /**
+     * Gets all dead bodies in the simulation
+     * @return List of all dead bodies in the simulation
+     */
+    public List<Entity> getAllDeadBodies() {
+        List<Entity> deadBodies = new ArrayList<>();
+        for (Entity entity : entities) {
+            if (entity.isDeadBody()) {
+                deadBodies.add(entity);
+            }
+        }
+        return deadBodies;
+    }
+    
+    /**
+     * Finds dead bodies within a certain radius of a point.
+     * Uses squared distance calculation to avoid expensive square root operations.
+     * 
+     * @param x Center x coordinate.
+     * @param y Center y coordinate.
+     * @param radius Search radius.
+     * @param world The world model (used for potential future optimizations with spatial partitioning).
+     * @return List of dead bodies within the radius, sorted by proximity.
+     */
+    public List<Entity> findDeadBodiesInRange(double x, double y, double radius, World world) {
+        List<Entity> found = new ArrayList<>();
+        double radiusSq = radius * radius;
+        
+        // First-pass filter: Only consider entities that could be in range based on rough bounds checking
+        int minX = (int) Math.floor(x - radius);
+        int maxX = (int) Math.ceil(x + radius);
+        int minY = (int) Math.floor(y - radius);
+        int maxY = (int) Math.ceil(y + radius);
+        
+        // Find all dead bodies in possible range
+        for (Entity entity : entities) {
+            if (!entity.isDeadBody()) continue;
+            
+            int entityX = entity.getX();
+            int entityY = entity.getY();
+            
+            // Quick bounds check before expensive distance calculation
+            if (entityX < minX || entityX > maxX || entityY < minY || entityY > maxY) {
+                continue;
+            }
+            
+            // Precise distance check
+            double dx = entityX - x;
+            double dy = entityY - y;
+            double distSq = dx*dx + dy*dy;
+            
+            if (distSq <= radiusSq) {
+                found.add(entity);
+            }
+        }
+        
+        // Sort by distance (useful for scavengers to prioritize closest dead bodies)
+        found.sort((e1, e2) -> {
+            double d1 = Math.pow(e1.getX() - x, 2) + Math.pow(e1.getY() - y, 2);
+            double d2 = Math.pow(e2.getX() - x, 2) + Math.pow(e2.getY() - y, 2);
+            return Double.compare(d1, d2);
+        });
+        
+        return found;
     }
 } 

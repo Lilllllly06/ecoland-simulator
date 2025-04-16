@@ -4,6 +4,9 @@ import com.ecoland.entity.Entity;
 import com.ecoland.entity.Herbivore;
 import com.ecoland.entity.Carnivore;
 import com.ecoland.entity.SpeciesType;
+import com.ecoland.entity.ApexPredator;
+import com.ecoland.entity.Omnivore;
+import com.ecoland.entity.Decomposer;
 import com.ecoland.model.TerrainType;
 import com.ecoland.model.Tile;
 import com.ecoland.model.World;
@@ -37,6 +40,7 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.shape.Rectangle;
 
 import java.io.File;
 import java.io.IOException;
@@ -76,7 +80,7 @@ public class EcolandApplication extends Application {
     
     // Entity placement tool
     private enum PlacementTool {
-        NONE, HERBIVORE, CARNIVORE, PLANT, FOOD
+        NONE, HERBIVORE, CARNIVORE, PLANT, FOOD, DECOMPOSER, APEX_PREDATOR, OMNIVORE
     }
     private PlacementTool currentTool = PlacementTool.NONE;
     private ToggleGroup toolToggleGroup;
@@ -84,6 +88,9 @@ public class EcolandApplication extends Application {
     // Initial simulation parameters
     private int initialHerbivoreCount = 50;
     private int initialCarnivoreCount = 5;
+    private int initialDecomposerCount = 5;
+    private int initialApexPredatorCount = 2;
+    private int initialOmnivoreCount = 5;
     private int worldWidth = 100;
     private int worldHeight = 100;
 
@@ -94,7 +101,8 @@ public class EcolandApplication extends Application {
         // Show initial setup dialog
         if (showSetupDialog()) {
             // Create simulation with chosen parameters
-            simulation = new Simulation(worldWidth, worldHeight);
+            simulation = new Simulation(worldWidth, worldHeight, initialHerbivoreCount, initialCarnivoreCount, 
+                         initialOmnivoreCount, 0, initialApexPredatorCount, initialDecomposerCount, null);
             
             BorderPane root = new BorderPane();
             root.setPadding(new Insets(10));
@@ -108,14 +116,18 @@ public class EcolandApplication extends Application {
             
             // Add scroll pane to support larger worlds with pan/zoom
             ScrollPane scrollPane = new ScrollPane(canvasContainer);
-            scrollPane.setPannable(true);
+            scrollPane.setPannable(false); // Disable built-in panning, we'll handle it ourselves
             scrollPane.setFitToWidth(true);
             scrollPane.setFitToHeight(true);
             root.setCenter(scrollPane);
             
             // Right: Controls and Info Panel
             VBox rightPanel = createControlPanel();
-            root.setRight(rightPanel);
+            ScrollPane rightScrollPane = new ScrollPane(rightPanel);
+            rightScrollPane.setFitToWidth(true);
+            rightScrollPane.setPrefWidth(320); // Slightly wider to account for scrollbar
+            rightScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); // No horizontal scrollbar
+            root.setRight(rightScrollPane);
             
             // Bottom: Statistics and charts
             HBox bottomPanel = createBottomPanel();
@@ -190,6 +202,24 @@ public class EcolandApplication extends Application {
         carnivoreSpinner.valueProperty().addListener((obs, oldVal, newVal) -> initialCarnivoreCount = newVal);
         grid.add(carnivoreSpinner, 1, 5);
         
+        grid.add(new Label("Decomposers:"), 0, 6);
+        Spinner<Integer> decomposerSpinner = new Spinner<>(0, 100, initialDecomposerCount, 1);
+        decomposerSpinner.setEditable(true);
+        decomposerSpinner.valueProperty().addListener((obs, oldVal, newVal) -> initialDecomposerCount = newVal);
+        grid.add(decomposerSpinner, 1, 6);
+        
+        grid.add(new Label("Apex Predators:"), 0, 7);
+        Spinner<Integer> apexPredatorSpinner = new Spinner<>(0, 20, initialApexPredatorCount, 1);
+        apexPredatorSpinner.setEditable(true);
+        apexPredatorSpinner.valueProperty().addListener((obs, oldVal, newVal) -> initialApexPredatorCount = newVal);
+        grid.add(apexPredatorSpinner, 1, 7);
+        
+        grid.add(new Label("Omnivores:"), 0, 8);
+        Spinner<Integer> omnivoreSpinner = new Spinner<>(0, 100, initialOmnivoreCount, 1);
+        omnivoreSpinner.setEditable(true);
+        omnivoreSpinner.valueProperty().addListener((obs, oldVal, newVal) -> initialOmnivoreCount = newVal);
+        grid.add(omnivoreSpinner, 1, 8);
+        
         // Buttons
         HBox buttonBox = new HBox(10);
         buttonBox.setAlignment(Pos.CENTER_RIGHT);
@@ -198,7 +228,7 @@ public class EcolandApplication extends Application {
         startButton.setDefaultButton(true);
         
         buttonBox.getChildren().addAll(cancelButton, startButton);
-        grid.add(buttonBox, 0, 7, 2, 1);
+        grid.add(buttonBox, 0, 9, 2, 1);
         
         // Event handlers
         boolean[] confirmed = new boolean[1];
@@ -254,6 +284,22 @@ public class EcolandApplication extends Application {
         Button saveLogButton = new Button("Save Data Log");
         saveLogButton.setOnAction(e -> saveSimulationLog());
         
+        // --- Color Legend ---
+        VBox legendBox = new VBox(5);
+        Label legendTitle = new Label("Entity Types:");
+        legendTitle.setFont(Font.font("System", FontWeight.BOLD, 12));
+        
+        legendBox.getChildren().add(legendTitle);
+        
+        // Add color squares with labels for each entity type
+        addColorLegendItem(legendBox, "Herbivore", Color.BLUE);
+        addColorLegendItem(legendBox, "Carnivore", Color.RED);
+        addColorLegendItem(legendBox, "Plant", Color.DARKGREEN);
+        addColorLegendItem(legendBox, "Omnivore", Color.ORANGE);
+        addColorLegendItem(legendBox, "Apex Predator", Color.DARKRED);
+        addColorLegendItem(legendBox, "Decomposer", Color.PURPLE);
+        addColorLegendItem(legendBox, "Scavenger", Color.BROWN);
+        
         // --- Neural Network Controls ---
         VBox aiControls = new VBox(5);
         Label aiTitle = new Label("AI Controls:");
@@ -267,7 +313,20 @@ public class EcolandApplication extends Application {
         carnivoreNeuralToggle.setSelected(true);
         carnivoreNeuralToggle.setOnAction(e -> toggleEntityNeuralBehavior(SpeciesType.CARNIVORE, carnivoreNeuralToggle.isSelected()));
         
-        aiControls.getChildren().addAll(aiTitle, herbivoreNeuralToggle, carnivoreNeuralToggle);
+        CheckBox decomposerNeuralToggle = new CheckBox("Neural Decomposers");
+        decomposerNeuralToggle.setSelected(true);
+        decomposerNeuralToggle.setOnAction(e -> toggleEntityNeuralBehavior(SpeciesType.DECOMPOSER, decomposerNeuralToggle.isSelected()));
+        
+        CheckBox apexPredatorNeuralToggle = new CheckBox("Neural Apex Predators");
+        apexPredatorNeuralToggle.setSelected(true);
+        apexPredatorNeuralToggle.setOnAction(e -> toggleEntityNeuralBehavior(SpeciesType.APEX_PREDATOR, apexPredatorNeuralToggle.isSelected()));
+        
+        CheckBox omnivoreNeuralToggle = new CheckBox("Neural Omnivores");
+        omnivoreNeuralToggle.setSelected(true);
+        omnivoreNeuralToggle.setOnAction(e -> toggleEntityNeuralBehavior(SpeciesType.OMNIVORE, omnivoreNeuralToggle.isSelected()));
+        
+        aiControls.getChildren().addAll(aiTitle, herbivoreNeuralToggle, carnivoreNeuralToggle, 
+                               decomposerNeuralToggle, apexPredatorNeuralToggle, omnivoreNeuralToggle);
         
         // --- Speed Slider ---
         VBox speedControl = new VBox(5);
@@ -339,6 +398,18 @@ public class EcolandApplication extends Application {
         foodToolRadio.setToggleGroup(toolToggleGroup);
         foodToolRadio.setUserData(PlacementTool.FOOD);
         
+        RadioButton decomposerToolRadio = new RadioButton("Place Decomposer");
+        decomposerToolRadio.setToggleGroup(toolToggleGroup);
+        decomposerToolRadio.setUserData(PlacementTool.DECOMPOSER);
+        
+        RadioButton apexPredatorToolRadio = new RadioButton("Place Apex Predator");
+        apexPredatorToolRadio.setToggleGroup(toolToggleGroup);
+        apexPredatorToolRadio.setUserData(PlacementTool.APEX_PREDATOR);
+        
+        RadioButton omnivoreToolRadio = new RadioButton("Place Omnivore");
+        omnivoreToolRadio.setToggleGroup(toolToggleGroup);
+        omnivoreToolRadio.setUserData(PlacementTool.OMNIVORE);
+        
         toolToggleGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal == null) {
                 currentTool = PlacementTool.NONE;
@@ -349,7 +420,8 @@ public class EcolandApplication extends Application {
         
         toolsControl.getChildren().addAll(
             toolsLabel, noToolRadio, herbivoreToolRadio, 
-            carnivoreToolRadio, plantToolRadio, foodToolRadio
+            carnivoreToolRadio, apexPredatorToolRadio, omnivoreToolRadio,
+            plantToolRadio, foodToolRadio, decomposerToolRadio
         );
         
         // --- Current Stats ---
@@ -374,7 +446,7 @@ public class EcolandApplication extends Application {
         // Add all components to the panel
         panel.getChildren().addAll(
             controlsTitle, controls, saveLoadControls, saveLogButton, 
-            aiControls, speedControl, new Separator(),
+            legendBox, aiControls, speedControl, new Separator(),
             zoomControl, new Separator(),
             toolsControl, new Separator(),
             statsBox, new Separator(), inspectorBox
@@ -413,7 +485,9 @@ public class EcolandApplication extends Application {
         speciesSelectionBox.setAlignment(Pos.CENTER);
         Label speciesLabel = new Label("Species:");
         ComboBox<SpeciesType> speciesComboBox = new ComboBox<>();
-        speciesComboBox.getItems().addAll(SpeciesType.HERBIVORE, SpeciesType.CARNIVORE);
+        speciesComboBox.getItems().addAll(SpeciesType.HERBIVORE, SpeciesType.CARNIVORE, 
+                                         SpeciesType.DECOMPOSER, SpeciesType.APEX_PREDATOR, 
+                                         SpeciesType.OMNIVORE);
         speciesComboBox.setValue(SpeciesType.HERBIVORE);
         speciesComboBox.setOnAction(e -> updateGeneStats(speciesComboBox.getValue()));
         
@@ -573,28 +647,33 @@ public class EcolandApplication extends Application {
         
         // Mouse drag events for panning
         canvas.setOnMousePressed(event -> {
-            if (event.isSecondaryButtonDown()) {
+            // Enable panning with right button (secondary) or middle button (middle)
+            if (event.isSecondaryButtonDown() || event.isMiddleButtonDown()) {
                 lastMouseX = event.getX();
                 lastMouseY = event.getY();
                 isPanning = true;
+                event.consume();
             }
         });
         
         canvas.setOnMouseDragged(event -> {
             if (isPanning) {
-                double dx = (event.getX() - lastMouseX) / zoomLevel;
-                double dy = (event.getY() - lastMouseY) / zoomLevel;
+                double dx = (event.getX() - lastMouseX);
+                double dy = (event.getY() - lastMouseY);
                 viewportX -= dx;
                 viewportY -= dy;
                 lastMouseX = event.getX();
                 lastMouseY = event.getY();
                 applyZoom();
+                event.consume();
             }
         });
         
         canvas.setOnMouseReleased(event -> {
-            if (event.isSecondaryButtonDown()) {
+            // End panning on any mouse button release if we were panning
+            if (isPanning) {
                 isPanning = false;
+                event.consume();
             }
         });
         
@@ -686,30 +765,57 @@ public class EcolandApplication extends Application {
                 }
                 break;
                 
+            case DECOMPOSER:
+                if (!simulation.getEntityManager().isTileOccupied(x, y)) {
+                    Entity decomposer = new com.ecoland.entity.Decomposer(x, y);
+                    simulation.getEntityManager().addEntity(decomposer);
+                    simulation.getEntityManager().updateEntityList();
+                    updateUI();
+                }
+                break;
+                
+            case APEX_PREDATOR:
+                if (!simulation.getEntityManager().isTileOccupied(x, y)) {
+                    Entity apexPredator = new com.ecoland.entity.ApexPredator(x, y);
+                    simulation.getEntityManager().addEntity(apexPredator);
+                    simulation.getEntityManager().updateEntityList();
+                    updateUI();
+                }
+                break;
+                
+            case OMNIVORE:
+                if (!simulation.getEntityManager().isTileOccupied(x, y)) {
+                    Entity omnivore = new com.ecoland.entity.Omnivore(x, y);
+                    simulation.getEntityManager().addEntity(omnivore);
+                    simulation.getEntityManager().updateEntityList();
+                    updateUI();
+                }
+                break;
+                
             default:
                 break;
         }
     }
 
+    /**
+     * Saves the data log from the simulation using a file chooser dialog.
+     */
     private void saveSimulationLog() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Save Simulation Data Log");
-        fileChooser.setInitialFileName("ecoland_data.csv");
-        fileChooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("CSV Files", "*.csv"),
-                new FileChooser.ExtensionFilter("All Files", "*.*")
-        );
-
-        File selectedFile = fileChooser.showSaveDialog(primaryStage);
-
-        if (selectedFile != null) {
-            boolean success = simulation.getDataLogger().saveData(selectedFile.getAbsolutePath());
-            if (success) {
-                showAlert(Alert.AlertType.INFORMATION, "Save Successful", 
-                          "Simulation data log saved to: " + selectedFile.getAbsolutePath());
-            } else {
-                showAlert(Alert.AlertType.ERROR, "Save Failed", 
-                          "Failed to save simulation data log. No data may be available yet.");
+        fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setInitialFileName("ecoland_simulation_log.csv");
+        
+        File file = fileChooser.showSaveDialog(primaryStage);
+        if (file != null) {
+            try {
+                simulation.getDataLogger().saveData(file.getAbsolutePath());
+                showAlert(Alert.AlertType.INFORMATION, "Data Log Saved", 
+                          "The simulation data log was successfully saved to:\n" + file.getAbsolutePath());
+            } catch (IOException e) {
+                showAlert(Alert.AlertType.ERROR, "Error Saving Data Log", 
+                          "Failed to save the simulation data log: " + e.getMessage());
             }
         }
     }
@@ -880,6 +986,9 @@ public class EcolandApplication extends Application {
         int herbivoreCount = simulation.getEntityManager().getPopulationCount(SpeciesType.HERBIVORE);
         int carnivoreCount = simulation.getEntityManager().getPopulationCount(SpeciesType.CARNIVORE);
         int plantCount = simulation.getEntityManager().getPopulationCount(SpeciesType.PLANT);
+        int decomposerCount = simulation.getEntityManager().getPopulationCount(SpeciesType.DECOMPOSER);
+        int apexPredatorCount = simulation.getEntityManager().getPopulationCount(SpeciesType.APEX_PREDATOR);
+        int omnivoreCount = simulation.getEntityManager().getPopulationCount(SpeciesType.OMNIVORE);
         int totalPop = simulation.getEntityManager().getTotalPopulation();
         
         statsLabel.setText(String.format(
@@ -887,8 +996,12 @@ public class EcolandApplication extends Application {
             "Total Population: %d\n" +
             "Herbivores: %d\n" +
             "Carnivores: %d\n" +
-            "Plants: %d",
-            tick, totalPop, herbivoreCount, carnivoreCount, plantCount
+            "Apex Predators: %d\n" +
+            "Omnivores: %d\n" +
+            "Plants: %d\n" +
+            "Decomposers: %d",
+            tick, totalPop, herbivoreCount, carnivoreCount, apexPredatorCount, 
+            omnivoreCount, plantCount, decomposerCount
         ));
 
         // Re-render the world
@@ -1018,8 +1131,36 @@ public class EcolandApplication extends Application {
                 else if (type == SpeciesType.CARNIVORE && entity instanceof Carnivore) {
                     ((Carnivore) entity).setUseNeuralBehavior(useNeural);
                 }
+                else if (type == SpeciesType.DECOMPOSER && entity instanceof Decomposer) {
+                    ((Decomposer) entity).setUseNeuralBehavior(useNeural);
+                }
+                else if (type == SpeciesType.APEX_PREDATOR && entity instanceof ApexPredator) {
+                    ((ApexPredator) entity).setUseNeuralBehavior(useNeural);
+                }
+                else if (type == SpeciesType.OMNIVORE && entity instanceof Omnivore) {
+                    ((Omnivore) entity).setUseNeuralBehavior(useNeural);
+                }
             }
         }
+    }
+
+    /**
+     * Helper method to add a color item to the legend
+     */
+    private void addColorLegendItem(VBox container, String label, Color color) {
+        HBox item = new HBox(10);
+        item.setAlignment(Pos.CENTER_LEFT);
+        
+        // Create color square
+        Rectangle colorSquare = new Rectangle(15, 15, color);
+        colorSquare.setStroke(Color.BLACK);
+        colorSquare.setStrokeWidth(0.5);
+        
+        // Create label
+        Label textLabel = new Label(label);
+        
+        item.getChildren().addAll(colorSquare, textLabel);
+        container.getChildren().add(item);
     }
 
     public static void main(String[] args) {

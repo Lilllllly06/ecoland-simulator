@@ -27,44 +27,85 @@ public class Genes {
     // public final double carnivoreAttackDamage; // Example for future
 
     /**
-     * Constructor for creating default genes for a species.
-     * Values should be reasonable defaults.
+     * Create genes object based on the species type.
+     * Sets reasonable defaults for each species.
      */
     public Genes(SpeciesType type) {
-        // Set default values based on species type
-        switch (type) {
-            case HERBIVORE:
-                this.speed = 1.0;
-                this.visionRange = 5.0;
-                this.maxEnergy = 100.0;
-                this.energyEfficiency = 1.0;
-                this.reproductionThreshold = 80.0;
-                this.reproductionCost = 40.0;
-                this.maxHealth = 100.0;
-                this.spreadChance = 0.0; // Not applicable
-                break;
-            case CARNIVORE:
-                this.speed = 1.2;
-                this.visionRange = 7.0;
-                this.maxEnergy = 120.0;
-                this.energyEfficiency = 1.0;
-                this.reproductionThreshold = 100.0;
-                this.reproductionCost = 50.0;
-                this.maxHealth = 100.0;
-                this.spreadChance = 0.0; // Not applicable
-                break;
-            case PLANT:
-            default:
-                // Plants might have different relevant genes (e.g., growth rate, spread chance)
-                this.speed = 0.0;
-                this.visionRange = 0.0;
-                this.maxEnergy = 10.0; // Represents max size/maturity?
-                this.energyEfficiency = 1.0;
-                this.reproductionThreshold = 8.0; // Maturity threshold for seeding
-                this.reproductionCost = 2.0;  // Cost for seeding
-                this.maxHealth = 1.0;
-                this.spreadChance = 0.01; // Default spread chance gene
-                break;
+        // Set appropriate defaults based on species
+        if (type == SpeciesType.HERBIVORE) {
+            speed = 1.0;
+            visionRange = 5.0;
+            maxEnergy = 100.0;
+            energyEfficiency = 1.0;
+            reproductionThreshold = 80.0;
+            reproductionCost = 40.0;
+            maxHealth = 100.0;
+            spreadChance = 0.0;
+        } else if (type == SpeciesType.CARNIVORE) {
+            speed = 1.2;
+            visionRange = 7.0;
+            maxEnergy = 120.0;
+            energyEfficiency = 1.0;
+            reproductionThreshold = 100.0;
+            reproductionCost = 50.0;
+            maxHealth = 100.0;
+            spreadChance = 0.0;
+        } else if (type == SpeciesType.OMNIVORE) {
+            speed = 1.1;
+            visionRange = 6.0;
+            maxEnergy = 110.0;
+            energyEfficiency = 1.1;
+            reproductionThreshold = 90.0;
+            reproductionCost = 45.0;
+            maxHealth = 100.0;
+            spreadChance = 0.0;
+        } else if (type == SpeciesType.APEX_PREDATOR) {
+            speed = 1.3;
+            visionRange = 8.0;
+            maxEnergy = 150.0;
+            energyEfficiency = 0.9;
+            reproductionThreshold = 120.0;
+            reproductionCost = 60.0;
+            maxHealth = 150.0;
+            spreadChance = 0.0;
+        } else if (type == SpeciesType.DECOMPOSER) {
+            speed = 0.8;
+            visionRange = 4.0;
+            maxEnergy = 80.0;
+            energyEfficiency = 1.2;
+            reproductionThreshold = 60.0;
+            reproductionCost = 30.0;
+            maxHealth = 70.0;
+            spreadChance = 0.0;
+        } else if (type == SpeciesType.SCAVENGER) {
+            speed = 1.2;
+            visionRange = 7.0;
+            maxEnergy = 90.0;
+            energyEfficiency = 1.3; // Very efficient at processing dead bodies
+            reproductionThreshold = 70.0;
+            reproductionCost = 35.0;
+            maxHealth = 80.0;
+            spreadChance = 0.0;
+        } else if (type == SpeciesType.PLANT) {
+            // Plants don't move, have small vision, but can spread
+            speed = 0.0;
+            visionRange = 0.0;
+            maxEnergy = 100.0;
+            energyEfficiency = 2.0; // Very efficient at storing energy from sunlight
+            reproductionThreshold = 50.0;
+            reproductionCost = 20.0;
+            maxHealth = 50.0;
+            spreadChance = 0.01; // Small chance to spread to nearby tiles
+        } else {
+            // Default for unspecified types (robust defaults)
+            speed = 1.0;
+            visionRange = 5.0;
+            maxEnergy = 100.0;
+            energyEfficiency = 1.0;
+            reproductionThreshold = 80.0;
+            reproductionCost = 40.0;
+            maxHealth = 100.0;
+            spreadChance = 0.0;
         }
     }
 

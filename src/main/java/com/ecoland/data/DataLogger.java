@@ -95,12 +95,11 @@ public class DataLogger {
     /**
      * Saves logged data to a CSV file
      * @param filePath Path to save the data
-     * @return true if save was successful, false otherwise
+     * @throws IOException If an I/O error occurs
      */
-    public boolean saveData(String filePath) {
+    public void saveData(String filePath) throws IOException {
         if (dataPoints.isEmpty()) {
-            System.out.println("No data to save");
-            return false;
+            throw new IOException("No data to save");
         }
         
         try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
@@ -118,10 +117,6 @@ public class DataLogger {
             }
             
             System.out.println("Data saved to: " + filePath);
-            return true;
-        } catch (IOException e) {
-            System.err.println("Error saving data: " + e.getMessage());
-            return false;
         }
     }
     

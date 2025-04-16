@@ -1,6 +1,7 @@
 package com.ecoland.entity;
 
 import com.ecoland.ai.nn.AnimalBrain;
+import com.ecoland.ai.nn.SpeciesBrainFactory;
 import com.ecoland.model.World;
 import com.ecoland.simulation.Simulation;
 
@@ -13,6 +14,7 @@ public abstract class Entity {
     protected boolean isAlive = true;
     protected final Genes genes;
     protected AnimalBrain brain; // Neural network brain for advanced decision-making
+    protected boolean isDecomposed = false;
 
     public Entity(int x, int y, SpeciesType speciesType, Genes genes) {
         this.x = x;
@@ -22,10 +24,8 @@ public abstract class Entity {
         this.health = genes.maxHealth;
         this.energy = genes.maxEnergy * 0.7;
         
-        // Initialize brain for animals (not plants)
-        if (speciesType != SpeciesType.PLANT) {
-            this.brain = new AnimalBrain((int)genes.visionRange);
-        }
+        // Initialize brain based on species type using the factory
+        this.brain = SpeciesBrainFactory.createBrain(speciesType, (int)genes.visionRange);
     }
 
     public Entity(int x, int y, SpeciesType speciesType) {
@@ -38,9 +38,9 @@ public abstract class Entity {
     protected Entity(int x, int y, SpeciesType speciesType, Genes genes, AnimalBrain parentBrain) {
         this(x, y, speciesType, genes);
         
-        // Override with parent's brain (with mutations)
-        if (parentBrain != null && speciesType != SpeciesType.PLANT) {
-            this.brain = new AnimalBrain(parentBrain); // Copy parent's brain
+        // Create a child brain from the parent's brain using the factory
+        if (parentBrain != null) {
+            this.brain = SpeciesBrainFactory.createChildBrain(parentBrain, speciesType);
         }
     }
 
@@ -85,6 +85,8 @@ public abstract class Entity {
     protected void die() {
         this.isAlive = false;
         System.out.println(speciesType + " at (" + x + ", " + y + ") died. Genes: " + genes.toString());
+        // Don't remove entity from the world immediately - it will remain as a dead body
+        // Decomposition will happen over time in the simulation tick
     }
 
     public int getX() {
@@ -150,5 +152,37 @@ public abstract class Entity {
     public void setPosition(int x, int y) {
         this.x = x;
         this.y = y;
+    }
+
+    /**
+     * Checks if this entity has a brain.
+     * @return true if the entity has a brain, false otherwise
+     */
+    public boolean hasBrain() {
+        return brain != null;
+    }
+
+    /**
+     * Checks if this entity is a dead body that hasn't been fully decomposed.
+     * @return true if entity is dead but not decomposed
+     */
+    public boolean isDeadBody() {
+        return !isAlive && !isDecomposed;
+    }
+    
+    /**
+     * Mark this entity as fully decomposed
+     */
+    public void setDecomposed() {
+        this.isDecomposed = true;
+    }
+    
+    /**
+     * Get remaining nutrition value from a dead body
+     * @return nutrition value based on entity's max energy
+     */
+    public double getDeadBodyNutritionValue() {
+        if (!isDeadBody()) return 0;
+        return genes.maxEnergy * 0.5; // Dead bodies provide 50% of their max energy as nutrition
     }
 } 

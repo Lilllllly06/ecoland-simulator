@@ -3,6 +3,7 @@ package com.ecoland.simulation;
 import com.ecoland.common.Constants;
 import com.ecoland.data.DataLogger; // Import DataLogger
 import com.ecoland.entity.*;
+import com.ecoland.generator.WorldGenerator; // Import WorldGenerator
 import com.ecoland.model.World;
 import com.ecoland.model.TerrainType;
 import com.ecoland.model.Tile;
@@ -16,18 +17,32 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
 
-public class Simulation {
+public class Simulation implements Serializable {
+    private static final long serialVersionUID = 1L;
 
+    // The world (2D grid of tiles)
     private final World world;
+    
+    // Entity manager for tracking all entities
     private final EntityManager entityManager;
-    private final DataLogger dataLogger; // Added DataLogger instance
+    
+    // Data logger for tracking simulation statistics
+    private final DataLogger dataLogger;
+    
+    // Current simulation tick
     private long currentTick = 0;
+    
+    // Random generator for various operations
     private final Random random = new Random();
-
-    // Simulation parameters (could be moved to a config object)
-    private int initialHerbivoreCount = 50;
-    private int initialCarnivoreCount = 5;
-    private int initialPlantCount = 100; // Plants represented differently, maybe seed tiles instead?
+    
+    // Initial population settings
+    private final int initialHerbivoreCount;
+    private final int initialCarnivoreCount;
+    private final int initialPlantCount;
+    private final int initialOmnivoreCount;
+    private final int initialScavengerCount;
+    private final int initialApexPredatorCount;
+    private final int initialDecomposerCount;
 
     // Class to represent the complete state of the simulation
     public static class SimulationState implements Serializable {
@@ -46,10 +61,15 @@ public class Simulation {
         private final int herbivoreCount;
         private final int carnivoreCount;
         private final int plantCount;
+        private final int omnivoreCount;
+        private final int scavengerCount;
+        private final int apexPredatorCount;
+        private final int decomposerCount;
         private final long savedTimestamp;
         
         public SimulationState(World world, List<Entity> entities, long tick, 
-                              int herbivoreCount, int carnivoreCount, int plantCount) {
+                              int herbivoreCount, int carnivoreCount, int plantCount,
+                              int omnivoreCount, int scavengerCount, int apexPredatorCount, int decomposerCount) {
             this.worldWidth = world.getWidth();
             this.worldHeight = world.getHeight();
             this.worldGrid = new Tile[worldWidth][worldHeight];
@@ -73,6 +93,10 @@ public class Simulation {
             this.herbivoreCount = herbivoreCount;
             this.carnivoreCount = carnivoreCount;
             this.plantCount = plantCount;
+            this.omnivoreCount = omnivoreCount;
+            this.scavengerCount = scavengerCount;
+            this.apexPredatorCount = apexPredatorCount;
+            this.decomposerCount = decomposerCount;
             this.savedTimestamp = System.currentTimeMillis();
         }
         
@@ -86,6 +110,10 @@ public class Simulation {
         public int getHerbivoreCount() { return herbivoreCount; }
         public int getCarnivoreCount() { return carnivoreCount; }
         public int getPlantCount() { return plantCount; }
+        public int getOmnivoreCount() { return omnivoreCount; }
+        public int getScavengerCount() { return scavengerCount; }
+        public int getApexPredatorCount() { return apexPredatorCount; }
+        public int getDecomposerCount() { return decomposerCount; }
     }
     
     // Class to represent the state of a single entity
@@ -121,6 +149,15 @@ public class Simulation {
                 case PLANT:
                     entity = new Plant(x, y, genes);
                     break;
+                case DECOMPOSER:
+                    entity = new Decomposer(x, y, genes);
+                    break;
+                case APEX_PREDATOR:
+                    entity = new ApexPredator(x, y, genes);
+                    break;
+                case OMNIVORE:
+                    entity = new Omnivore(x, y, genes);
+                    break;
             }
             
             if (entity != null) {
@@ -142,36 +179,89 @@ public class Simulation {
         }
     }
 
-    public Simulation(int width, int height) {
+    /**
+     * Create a new Simulation with a world of the given dimensions.
+     * 
+     * @param width Width of the world
+     * @param height Height of the world
+     * @param herbivoreCount Initial number of herbivores
+     * @param carnivoreCount Initial number of carnivores
+     * @param generator Optional world generator to use (if null, a default will be used)
+     */
+    public Simulation(int width, int height, int herbivoreCount, int carnivoreCount, 
+                      int omnivoreCount, int scavengerCount, int apexPredatorCount, int decomposerCount,
+                      WorldGenerator generator) {
+        // Create the world
         this.world = new World(width, height);
-        this.entityManager = new EntityManager();
-        this.dataLogger = new DataLogger(10); // Log every 10 ticks
-        initializePopulation();
-        this.dataLogger.recordTick(0, this.entityManager); // Log initial state at tick 0
-    }
-
-    // Constructor using default world size
-    public Simulation() {
-        this(Constants.DEFAULT_WORLD_WIDTH, Constants.DEFAULT_WORLD_HEIGHT);
-    }
-
-    // Constructor to restore a simulation from saved state
-    public Simulation(SimulationState state) {
-        // Create a world with the saved dimensions
-        this.world = new World(state.getWorldWidth(), state.getWorldHeight(), false); // false means don't initialize
         
-        // Restore all tiles
-        Tile[][] savedGrid = state.getWorldGrid();
+        // Use the provided generator or create a default one
+        WorldGenerator worldGen = (generator != null) ? generator : WorldGenerator.createDefaultGenerator();
+        worldGen.generate(world);
+        
+        // Create entity manager
+        this.entityManager = new EntityManager();
+        
+        // Set initial population counts
+        this.initialHerbivoreCount = herbivoreCount;
+        this.initialCarnivoreCount = carnivoreCount;
+        this.initialPlantCount = 0; // Plants are handled by the world tiles
+        this.initialOmnivoreCount = omnivoreCount;
+        this.initialScavengerCount = scavengerCount;
+        this.initialApexPredatorCount = apexPredatorCount;
+        this.initialDecomposerCount = decomposerCount;
+        
+        // Initialize the data logger to record every 10 ticks
+        this.dataLogger = new DataLogger(10);
+        
+        // Create initial population
+        initializePopulation();
+        
+        // Record initial state
+        dataLogger.recordTick(currentTick, entityManager);
+    }
+    
+    /**
+     * Create a new Simulation with default initial population values.
+     * 
+     * @param width Width of the world
+     * @param height Height of the world
+     */
+    public Simulation(int width, int height) {
+        this(width, height, 20, 5, 0, 0, 0, 5, null);
+    }
+    
+    /**
+     * Create a new Simulation with specified herbivore and carnivore counts.
+     * 
+     * @param width Width of the world
+     * @param height Height of the world
+     * @param herbivoreCount Initial number of herbivores
+     * @param carnivoreCount Initial number of carnivores
+     */
+    public Simulation(int width, int height, int herbivoreCount, int carnivoreCount) {
+        this(width, height, herbivoreCount, carnivoreCount, 0, 0, 0, 0, null);
+    }
+
+    /**
+     * Create a simulation from a saved simulation state.
+     * 
+     * @param state The saved simulation state to restore
+     */
+    public Simulation(SimulationState state) {
+        // Create the world with the dimensions from the state
+        this.world = new World(state.getWorldWidth(), state.getWorldHeight());
+        
+        // Copy all tile data from the state
         for (int x = 0; x < state.getWorldWidth(); x++) {
             for (int y = 0; y < state.getWorldHeight(); y++) {
-                world.setTile(x, y, savedGrid[x][y]);
+                world.setTile(x, y, state.getWorldGrid()[x][y]);
             }
         }
         
         // Create entity manager
         this.entityManager = new EntityManager();
         
-        // Restore all entities
+        // Restore entity states
         for (EntityState entityState : state.getEntities()) {
             Entity entity = entityState.createEntity();
             if (entity != null) {
@@ -179,16 +269,26 @@ public class Simulation {
             }
         }
         
-        // Create a data logger and record the current state
-        this.dataLogger = new DataLogger(10); // Log every 10 ticks
-        this.currentTick = state.getTick();
-        this.dataLogger.recordTick(currentTick, entityManager);
-        
-        // Process the entity additions
+        // Process entity additions immediately (unlike normal initialization)
         entityManager.updateEntityList();
         
-        System.out.println("Restored simulation state from tick " + currentTick + 
-                           " with " + entityManager.getTotalPopulation() + " entities.");
+        // Initialize data logger
+        this.dataLogger = new DataLogger(10);
+        
+        // Set current tick from state
+        this.currentTick = state.getTick();
+        
+        // Restore counts for information
+        this.initialHerbivoreCount = state.getHerbivoreCount();
+        this.initialCarnivoreCount = state.getCarnivoreCount();
+        this.initialPlantCount = state.getPlantCount();
+        this.initialOmnivoreCount = state.getOmnivoreCount();
+        this.initialScavengerCount = state.getScavengerCount();
+        this.initialApexPredatorCount = state.getApexPredatorCount();
+        this.initialDecomposerCount = state.getDecomposerCount();
+        
+        // Record initial state for the logger
+        dataLogger.recordTick(currentTick, entityManager);
     }
 
     private void initializePopulation() {
@@ -200,6 +300,32 @@ public class Simulation {
         // Add Carnivores
         for (int i = 0; i < initialCarnivoreCount; i++) {
             spawnEntity(SpeciesType.CARNIVORE);
+        }
+        
+        // Initialize apex predators
+        if (initialApexPredatorCount > 0) {
+            for (int i = 0; i < initialApexPredatorCount; i++) {
+                spawnEntity(SpeciesType.APEX_PREDATOR);
+            }
+        }
+
+        // Initialize omnivores
+        if (initialOmnivoreCount > 0) {
+            for (int i = 0; i < initialOmnivoreCount; i++) {
+                spawnEntity(SpeciesType.OMNIVORE);
+            }
+        }
+        
+        // Add Scavengers
+        for (int i = 0; i < initialScavengerCount; i++) {
+            spawnEntity(SpeciesType.SCAVENGER);
+        }
+        
+        // Initialize decomposers
+        if (initialDecomposerCount > 0) {
+            for (int i = 0; i < initialDecomposerCount; i++) {
+                spawnEntity(SpeciesType.DECOMPOSER);
+            }
         }
 
         // Add initial Plants (or ensure generator creates enough initial food)
@@ -214,8 +340,11 @@ public class Simulation {
         entityManager.updateEntityList(); // Process initial additions
         System.out.println("Initial population: " +
                            "Herbivores: " + entityManager.getPopulationCount(SpeciesType.HERBIVORE) + ", " +
-                           "Carnivores: " + entityManager.getPopulationCount(SpeciesType.CARNIVORE));
-
+                           "Carnivores: " + entityManager.getPopulationCount(SpeciesType.CARNIVORE) + ", " +
+                           "Omnivores: " + entityManager.getPopulationCount(SpeciesType.OMNIVORE) + ", " +
+                           "Scavengers: " + entityManager.getPopulationCount(SpeciesType.SCAVENGER) + ", " +
+                           "Apex Predators: " + entityManager.getPopulationCount(SpeciesType.APEX_PREDATOR) + ", " +
+                           "Decomposers: " + entityManager.getPopulationCount(SpeciesType.DECOMPOSER));
     }
 
     // Helper to spawn an entity at a random valid location
@@ -236,6 +365,18 @@ public class Simulation {
                         break;
                     case PLANT:
                         entity = new Plant(x, y); // If using explicit Plant entities
+                        break;
+                    case OMNIVORE:
+                        entity = new Omnivore(x, y);
+                        break;
+                    case SCAVENGER:
+                        entity = new Scavenger(x, y);
+                        break;
+                    case APEX_PREDATOR:
+                        entity = new ApexPredator(x, y);
+                        break;
+                    case DECOMPOSER:
+                        entity = new Decomposer(x, y);
                         break;
                 }
                 if (entity != null) {
@@ -292,7 +433,7 @@ public class Simulation {
         }
     }
 
-    // Placeholder for world updates independent of entities (e.g., rain, passive plant growth)
+    // Help entities find food and move more effectively
     private void updateWorldState() {
         // Example: passive plant food regrowth on fertile land tiles
         double passiveRegrowthRate = 0.01;
@@ -304,6 +445,16 @@ public class Simulation {
                      tile.growPlantFood(tile.getFertility() * passiveRegrowthRate);
                      // TODO: Add max food cap based on tile type/fertility
                  }
+            }
+        }
+        
+        // Process dead bodies - allow a small chance for them to decompose naturally
+        List<Entity> deadBodies = entityManager.getAllDeadBodies();
+        for (Entity deadBody : deadBodies) {
+            // 1% chance to decompose naturally each tick
+            if (random.nextDouble() < 0.01) {
+                deadBody.setDecomposed();
+                entityManager.removeEntity(deadBody);
             }
         }
     }
@@ -359,6 +510,38 @@ public class Simulation {
             case PLANT:
                 offspring = new Plant(spawnX, spawnY, genes);
                 break;
+            case OMNIVORE:
+                if (parent.hasBrain()) {
+                    offspring = new Omnivore(spawnX, spawnY, genes, parent.getBrain());
+                } else {
+                    offspring = new Omnivore(spawnX, spawnY, genes);
+                }
+                break;
+            case SCAVENGER:
+                if (parent.hasBrain()) {
+                    // Create a neural network-enabled scavenger with parent's brain as template
+                    offspring = new Scavenger(spawnX, spawnY, genes, parent.getBrain());
+                } else {
+                    // Create a standard rule-based scavenger
+                    offspring = new Scavenger(spawnX, spawnY, genes);
+                }
+                break;
+            case APEX_PREDATOR:
+                if (parent.hasBrain()) {
+                    offspring = new ApexPredator(spawnX, spawnY, genes, parent.getBrain());
+                } else {
+                    offspring = new ApexPredator(spawnX, spawnY, genes);
+                }
+                break;
+            case DECOMPOSER:
+                // To be implemented
+                // System.out.println("Decomposer offspring not yet implemented");
+                if (parent.getBrain() != null) {
+                    offspring = new Decomposer(spawnX, spawnY, genes, parent.getBrain());
+                } else {
+                    offspring = new Decomposer(spawnX, spawnY, genes);
+                }
+                break;
             default:
                 System.err.println("Cannot spawn unknown offspring type: " + offspringType);
                 return null;
@@ -382,7 +565,11 @@ public class Simulation {
             currentTick,
             entityManager.getPopulationCount(SpeciesType.HERBIVORE),
             entityManager.getPopulationCount(SpeciesType.CARNIVORE),
-            entityManager.getPopulationCount(SpeciesType.PLANT)
+            entityManager.getPopulationCount(SpeciesType.PLANT),
+            entityManager.getPopulationCount(SpeciesType.OMNIVORE),
+            entityManager.getPopulationCount(SpeciesType.SCAVENGER),
+            entityManager.getPopulationCount(SpeciesType.APEX_PREDATOR),
+            entityManager.getPopulationCount(SpeciesType.DECOMPOSER)
         );
     }
     
@@ -431,6 +618,10 @@ public class Simulation {
         return entityManager;
     }
 
+    /**
+     * Gets the data logger for this simulation.
+     * @return The DataLogger instance
+     */
     public DataLogger getDataLogger() {
         return dataLogger;
     }
@@ -453,4 +644,120 @@ public class Simulation {
     // TODO: Implement methods for pause, resume, speed change, user interaction (spawn, place food)
     // These will likely interact with a timer/loop in the main application thread.
 
+    private void reproduce(Entity parent) {
+        // Get a valid spawn location near the parent
+        Position pos = getValidEntitySpawnLocation(parent.getX(), parent.getY(), 3);
+        if (pos == null) {
+            return; // No valid position found
+        }
+
+        Entity offspring = null;
+        switch (parent.getSpeciesType()) {
+            case HERBIVORE:
+                if (parent.hasBrain()) {
+                    offspring = new Herbivore(pos.x, pos.y, parent.getGenes(), parent.getBrain());
+                } else {
+                    offspring = new Herbivore(pos.x, pos.y, parent.getGenes());
+                }
+                break;
+            case CARNIVORE:
+                if (parent.hasBrain()) {
+                    offspring = new Carnivore(pos.x, pos.y, parent.getGenes(), parent.getBrain());
+                } else {
+                    offspring = new Carnivore(pos.x, pos.y, parent.getGenes());
+                }
+                break;
+            case PLANT:
+                offspring = new Plant(pos.x, pos.y, parent.getGenes());
+                break;
+            case SCAVENGER:
+                if (parent.hasBrain()) {
+                    offspring = new Scavenger(pos.x, pos.y, parent.getGenes(), parent.getBrain());
+                } else {
+                    offspring = new Scavenger(pos.x, pos.y, parent.getGenes());
+                }
+                break;
+            case OMNIVORE:
+                if (parent.hasBrain()) {
+                    offspring = new Omnivore(pos.x, pos.y, parent.getGenes(), parent.getBrain());
+                } else {
+                    offspring = new Omnivore(pos.x, pos.y, parent.getGenes());
+                }
+                break;
+            case APEX_PREDATOR:
+                if (parent.hasBrain()) {
+                    offspring = new ApexPredator(pos.x, pos.y, parent.getGenes(), parent.getBrain());
+                } else {
+                    offspring = new ApexPredator(pos.x, pos.y, parent.getGenes());
+                }
+                break;
+            case DECOMPOSER:
+                if (parent.hasBrain()) {
+                    offspring = new Decomposer(pos.x, pos.y, parent.getGenes(), parent.getBrain());
+                } else {
+                    offspring = new Decomposer(pos.x, pos.y, parent.getGenes());
+                }
+                break;
+        }
+
+        if (offspring != null) {
+            entityManager.addEntity(offspring);
+        }
+    }
+
+    /**
+     * Utility class to represent a position in the world.
+     */
+    private static class Position {
+        final int x;
+        final int y;
+        
+        Position(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+    
+    /**
+     * Get a valid spawn location near the parent entity.
+     * 
+     * @param parentX The parent's X coordinate
+     * @param parentY The parent's Y coordinate
+     * @param radius The radius to search for valid spawn locations
+     * @return A valid position or null if none found
+     */
+    private Position getValidEntitySpawnLocation(int parentX, int parentY, int radius) {
+        // Try up to 10 random positions within the radius
+        for (int attempt = 0; attempt < 10; attempt++) {
+            int dx = random.nextInt(2 * radius + 1) - radius;
+            int dy = random.nextInt(2 * radius + 1) - radius;
+            
+            int newX = parentX + dx;
+            int newY = parentY + dy;
+            
+            // Check if the position is valid
+            if (world.isValidCoordinate(newX, newY) && 
+                world.getTile(newX, newY).getTerrainType() != TerrainType.WATER) {
+                return new Position(newX, newY);
+            }
+        }
+        
+        // If all random attempts failed, check immediate neighbors
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                if (dx == 0 && dy == 0) continue; // Skip parent's position
+                
+                int newX = parentX + dx;
+                int newY = parentY + dy;
+                
+                if (world.isValidCoordinate(newX, newY) && 
+                    world.getTile(newX, newY).getTerrainType() != TerrainType.WATER) {
+                    return new Position(newX, newY);
+                }
+            }
+        }
+        
+        // No valid position found
+        return null;
+    }
 } 

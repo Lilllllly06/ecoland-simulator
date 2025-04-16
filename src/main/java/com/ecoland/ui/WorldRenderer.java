@@ -31,6 +31,11 @@ public class WorldRenderer {
     private static final Color HERBIVORE_COLOR = Color.BLUE;
     private static final Color CARNIVORE_COLOR = Color.RED;
     private static final Color PLANT_COLOR = Color.DARKGREEN; // If drawing explicit plant entities
+    private static final Color DECOMPOSER_COLOR = Color.PURPLE;
+    private static final Color OMNIVORE_COLOR = Color.ORANGE;
+    private static final Color APEX_PREDATOR_COLOR = Color.DARKRED;
+    private static final Color SCAVENGER_COLOR = Color.BROWN;
+    private static final Color DEAD_BODY_COLOR = Color.DARKGRAY;
 
     public WorldRenderer(Canvas canvas, World world) {
         this.canvas = canvas;
@@ -96,7 +101,31 @@ public class WorldRenderer {
             }
         }
 
-        // 2. Draw Entities (only those in the visible area)
+        // 2. Draw Dead Bodies (Draw them before live entities so live ones appear on top)
+        double deadBodyRadius = effectiveTileSize * 0.3;
+        for (Entity entity : entities) {
+            if (entity.isDeadBody()) {
+                int x = entity.getX();
+                int y = entity.getY();
+                
+                // Skip if entity is outside the visible area
+                if (x < startX || x >= endX || y < startY || y >= endY) {
+                    continue;
+                }
+                
+                // Draw X shape for dead bodies
+                gc.setStroke(DEAD_BODY_COLOR);
+                gc.setLineWidth(2);
+                double drawX = ((x + 0.5) * effectiveTileSize) - viewportX;
+                double drawY = ((y + 0.5) * effectiveTileSize) - viewportY;
+                gc.strokeLine(drawX - deadBodyRadius, drawY - deadBodyRadius, 
+                             drawX + deadBodyRadius, drawY + deadBodyRadius);
+                gc.strokeLine(drawX + deadBodyRadius, drawY - deadBodyRadius, 
+                             drawX - deadBodyRadius, drawY + deadBodyRadius);
+            }
+        }
+
+        // 3. Draw Live Entities (only those in the visible area)
         double entityRadius = effectiveTileSize * 0.4;
         for (Entity entity : entities) {
             if (entity.isAlive()) {
@@ -189,6 +218,10 @@ public class WorldRenderer {
             case HERBIVORE: return HERBIVORE_COLOR;
             case CARNIVORE: return CARNIVORE_COLOR;
             case PLANT: return PLANT_COLOR;
+            case DECOMPOSER: return DECOMPOSER_COLOR;
+            case OMNIVORE: return OMNIVORE_COLOR;
+            case APEX_PREDATOR: return APEX_PREDATOR_COLOR;
+            case SCAVENGER: return SCAVENGER_COLOR;
             default: return Color.GRAY; // Unknown entity type
         }
     }
