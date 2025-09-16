@@ -118,7 +118,7 @@ Then the main window opens with:
 - UI polish, presets, screenshot/recording tools.
 
 ## License
-Choose a license (e.g., MIT) and add it here.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 Made with Java 17 + JavaFX. Contributions and feedback are welcome!
