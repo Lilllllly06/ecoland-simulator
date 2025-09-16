@@ -4,7 +4,6 @@ An interactive, agent-based ecosystem simulator written in Java 17 with JavaFX. 
 
 ### Demo
 
-<<<<<<< Updated upstream
 <video
   autoplay
   muted
@@ -15,11 +14,6 @@ An interactive, agent-based ecosystem simulator written in Java 17 with JavaFX. 
   <source src="assets/ecoland-demo.mp4" type="video/mp4" />
   Your browser does not support the video tag.
 </video>
-=======
-https://github.com/Lilllllly06/ecoland-simulator/assets/your-asset-id/Screen%20Recording%202025-09-15%20at%205.04.12%20PM.mov
-
-![Demo Video](https://github.com/Lilllllly06/ecoland-simulator/assets/your-asset-id/Screen%20Recording%202025-09-15%20at%205.04.12%20PM.mov)
->>>>>>> Stashed changes
 
 ## Key Features
 - **Procedural world generation**: Perlin-noise-based elevation, temperature, and moisture maps create varied terrain and biomes (ocean, lake, desert, plains, forest, swamp, mountains).
@@ -135,8 +129,5 @@ Then the main window opens with:
 Choose a license (e.g., MIT) and add it here.
 
 ---
-<<<<<<< Updated upstream
 Made with Java 17 + JavaFX. Contributions and feedback are welcome!
-=======
 Made with Java 17 + JavaFX. Contributions and feedback are welcome!
->>>>>>> Stashed changes
