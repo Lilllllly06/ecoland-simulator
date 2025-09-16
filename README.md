@@ -4,7 +4,6 @@ An interactive, agent-based ecosystem simulator written in Java 17 with JavaFX. 
 
 ### Demo
 [![Ecoland Simulator Demo](Ecoland%20Demo%20Thumbnail.png)](https://lilllllly06.github.io/ecoland-simulator/Ecoland%20Demo.webm)
-
 > Click the image above to watch a short video demo of the application in action.
 > 
 ## Key Features
