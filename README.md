@@ -5,6 +5,8 @@ An interactive, agent-based ecosystem simulator written in Java 17 with JavaFX. 
 ### Demo
 
 <video
+  poster="assets/ecoland-demo-poster.png"
+  poster="assets/ecoland-demo-poster.png"
   autoplay
   muted
   loop
