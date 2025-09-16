@@ -3,7 +3,7 @@
 An interactive, agent-based ecosystem simulator written in Java 17 with JavaFX. It generates a procedural world (Perlin-noise terrain and biomes) and simulates populations of species (herbivores, carnivores, omnivores, apex predators, decomposers, plants, scavengers) with energy/health dynamics, reproduction, and optional neural-network-driven behavior. The UI renders the world, provides tools to place entities, and offers real-time charts and gene statistics.
 
 ### Demo
-[![Ecoland Simulator Demo](Ecoland%20Demo%20Thumbnail.png)](https://lilllllly06.github.io/ecoland-simulator/demo.html)
+[![Ecoland Simulator Demo (GIF)](assets/Ecoland%20Demo.gif)](https://lilllllly06.github.io/ecoland-simulator/demo.html)
 
 > Click the image above to watch a short video demo of the application in action.
 
